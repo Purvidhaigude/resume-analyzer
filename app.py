@@ -1,90 +1,153 @@
 from dotenv import load_dotenv
-
-load_dotenv()
 import base64
 import streamlit as st
 import os
 import io
-from PIL import Image 
+from PIL import Image
 import pdf2image
 import google.generativeai as genai
+import plotly.graph_objects as go
 
+load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-def get_gemini_response(input,pdf_cotent,prompt):
-    # ✅ Naya sahi
+# ---------------------- Gemini Response ----------------------
+def get_gemini_response(prompt, pdf_content=None, job_desc=""):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    response=model.generate_content([input,pdf_content[0],prompt])
+
+    parts = []
+    if job_desc:
+        parts.append(f"Job Description:\n{job_desc}")
+    if pdf_content:
+        parts.append(pdf_content[0])
+    parts.append(prompt)
+
+    response = model.generate_content(parts)
     return response.text
 
+# ---------------------- PDF Setup ----------------------
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
-        ## Convert the PDF to image
-        images=pdf2image.convert_from_bytes(uploaded_file.read())
-
-        first_page=images[0]
-
-        # Convert to bytes
-        img_byte_arr = io.BytesIO()
-        first_page.save(img_byte_arr, format='JPEG')
-        img_byte_arr = img_byte_arr.getvalue()
-
-        pdf_parts = [
-            {
+        images = pdf2image.convert_from_bytes(uploaded_file.read())
+        pdf_parts = []
+        for page in images:
+            img_byte_arr = io.BytesIO()
+            page.save(img_byte_arr, format='JPEG')
+            img_byte_arr = img_byte_arr.getvalue()
+            pdf_parts.append({
                 "mime_type": "image/jpeg",
-                "data": base64.b64encode(img_byte_arr).decode()  # encode to base64
-            }
-        ]
+                "data": base64.b64encode(img_byte_arr).decode()
+            })
         return pdf_parts
     else:
-        raise FileNotFoundError("No file uploaded")
+        return None
 
-## Streamlit App
+# ---------------------- Streamlit UI ----------------------
+st.set_page_config(page_title="ATS Resume Expert + Chatbot", page_icon="🤖", layout="wide")
 
-st.set_page_config(page_title="ATS Resume EXpert")
-st.header("ATS Tracking System")
-input_text=st.text_area("Job Description: ",key="input")
-uploaded_file=st.file_uploader("Upload your resume(PDF)...",type=["pdf"])
+st.title("📄 ATS Resume Expert + 🤖 Chatbot")
+st.caption("Analyze your resume & chat with AI (English or Simple Language)")
 
+# Job description + resume upload
+job_desc = st.text_area("📝 Job Description", key="jobdesc")
+uploaded_file = st.file_uploader("📂 Upload your Resume (PDF)", type=["pdf"])
 
 if uploaded_file is not None:
-    st.write("PDF Uploaded Successfully")
+    st.success("✅ PDF Uploaded Successfully!")
 
+# ---------------------- Buttons ----------------------
+col1, col2 = st.columns(2)
+with col1:
+    submit1 = st.button("🔍 Tell Me About the Resume")
+with col2:
+    submit2 = st.button("📊 Percentage Match & Missing Skills")
 
-submit1 = st.button("Tell Me About the Resume")
-
-#submit2 = st.button("How Can I Improvise my Skills")
-
-submit3 = st.button("Percentage match")
-
+# Prompts for buttons
 input_prompt1 = """
- You are an experienced Technical Human Resource Manager,your task is to review the provided resume against the job description. 
-  Please share your professional evaluation on whether the candidate's profile aligns with the role. 
- Highlight the strengths and weaknesses of the applicant in relation to the specified job requirements.
+You are an experienced Technical Human Resource Manager. 
+Review the resume against the job description and give strengths & weaknesses.
 """
 
-input_prompt3 = """
-You are an skilled ATS (Applicant Tracking System) scanner with a deep understanding of data science and ATS functionality, 
-your task is to evaluate the resume against the provided job description. give me the percentage of match if the resume matches
-the job description. First the output should come as percentage and then keywords missing and last final thoughts.
+input_prompt2 = """
+You are an ATS system. 
+Evaluate the resume vs job description. 
+Give percentage match, missing keywords, and improvement tips.
 """
 
+# ---------------------- Button Logic ----------------------
 if submit1:
-    if uploaded_file is not None:
-        pdf_content=input_pdf_setup(uploaded_file)
-        response=get_gemini_response(input_prompt1,pdf_content,input_text)
-        st.subheader("The Repsonse is")
+    if uploaded_file:
+        pdf_content = input_pdf_setup(uploaded_file)
+        response = get_gemini_response(input_prompt1, pdf_content, job_desc)
+        st.subheader("📝 Resume Analysis")
         st.write(response)
     else:
-        st.write("Please uplaod the resume")
+        st.warning("⚠️ Please upload your resume.")
 
-elif submit3:
-    if uploaded_file is not None:
-        pdf_content=input_pdf_setup(uploaded_file)
-        response=get_gemini_response(input_prompt3,pdf_content,input_text)
-        st.subheader("The Repsonse is")
+elif submit2:
+    if uploaded_file:
+        pdf_content = input_pdf_setup(uploaded_file)
+        response = get_gemini_response(input_prompt2, pdf_content, job_desc)
+
+        # Extract percentage if available
+        try:
+            percent = int([s for s in response.split() if "%" in s][0].replace("%", ""))
+        except:
+            percent = 75
+
+        # Gauge chart
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=percent,
+            title={'text': "ATS Match %"},
+            gauge={'axis': {'range': [0, 100]},
+                   'bar': {'color': "purple"}}
+        ))
+        st.plotly_chart(fig)
+
+        st.subheader("📊 Detailed ATS Report")
         st.write(response)
     else:
-        st.write("Please uplaod the resume")
+        st.warning("⚠️ Please upload your resume.")
 
+# ---------------------- Chatbot ----------------------
+st.markdown("---")
+st.header("💬 Chat with Resume Coach")
+
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# User query
+if user_input := st.chat_input("Ask you'r question..."):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    # Decide style based on query
+    if "own language" in user_input.lower() or "simple" in user_input.lower():
+        style_prompt = """
+        You are a friendly mentor. 
+        Answer in **very simple human language** (like talking to a friend). 
+        Avoid technical terms. End with 2-3 bullet point summary.
+        """
+    else:
+        style_prompt = """
+        You are a professional career advisor. 
+        Answer in **formal English**, structured and clear. 
+        End with a short summary in bullet points.
+        """
+
+    pdf_context = input_pdf_setup(uploaded_file) if uploaded_file else None
+    ai_response = get_gemini_response(f"{style_prompt}\nUser Query: {user_input}", pdf_context, job_desc)
+
+    with st.chat_message("assistant"):
+        st.markdown(ai_response)
+
+    st.session_state.messages.append({"role": "assistant", "content": ai_response})
 
