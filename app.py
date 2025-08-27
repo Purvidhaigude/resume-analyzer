@@ -6,8 +6,10 @@ from PIL import Image
 import pdf2image
 import google.generativeai as genai
 import plotly.graph_objects as go
+import pytesseract   # 🔹 OCR ke liye
 
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+
 # ---------------------- Gemini Response ----------------------
 def get_gemini_response(prompt, pdf_content=None, job_desc=""):
     model = genai.GenerativeModel("gemini-1.5-flash")
@@ -16,28 +18,25 @@ def get_gemini_response(prompt, pdf_content=None, job_desc=""):
     if job_desc:
         parts.append(f"Job Description:\n{job_desc}")
     if pdf_content:
-        parts.append(pdf_content[0])
+        parts.append(pdf_content[0])   # ab ye text hai
     parts.append(prompt)
 
     response = model.generate_content(parts)
     return response.text
 
 
+# ---------------------- PDF Setup (updated with OCR) ----------------------
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
         images = pdf2image.convert_from_bytes(uploaded_file.read())
-        pdf_parts = []
+        pdf_text = ""
         for page in images:
-            img_byte_arr = io.BytesIO()
-            page.save(img_byte_arr, format='JPEG')
-            img_byte_arr = img_byte_arr.getvalue()
-            pdf_parts.append({
-                "mime_type": "image/jpeg",
-                "data": base64.b64encode(img_byte_arr).decode()
-            })
-        return pdf_parts
+            text = pytesseract.image_to_string(page)  # image se text nikalna
+            pdf_text += text + "\n"
+        return [pdf_text] if pdf_text.strip() else None
     else:
         return None
+
 
 # ---------------------- Streamlit UI ----------------------
 st.set_page_config(page_title="ATS Resume Expert + Chatbot", page_icon="🤖", layout="wide")
@@ -147,5 +146,3 @@ if user_input := st.chat_input("Ask you'r question..."):
         st.markdown(ai_response)
 
     st.session_state.messages.append({"role": "assistant", "content": ai_response})
-
-
