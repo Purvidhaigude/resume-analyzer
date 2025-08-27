@@ -1,8 +1,10 @@
-import streamlit as st
+from dotenv import load_dotenv
 import base64
+import streamlit as st
+import os
 import io
 from PIL import Image
-import pypdf   # ✅ sahi package
+import pdf2image
 import google.generativeai as genai
 import plotly.graph_objects as go
 
@@ -23,7 +25,7 @@ def get_gemini_response(prompt, pdf_content=None, job_desc=""):
     response = model.generate_content(parts)
     return response.text
 
-# ---------------------- PDF Setup ----------------------
+
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
         images = pdf2image.convert_from_bytes(uploaded_file.read())
@@ -148,4 +150,5 @@ if user_input := st.chat_input("Ask you'r question..."):
         st.markdown(ai_response)
 
     st.session_state.messages.append({"role": "assistant", "content": ai_response})
+
 
