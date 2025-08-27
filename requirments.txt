@@ -1,6 +1,6 @@
 streamlit
 google-generativeai
-python-dotenv
+pillow
 pdf2image
 plotly
 pillow

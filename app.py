@@ -1,16 +1,13 @@
-from dotenv import load_dotenv
-import base64
 import streamlit as st
 import os
+import base64
 import io
 from PIL import Image
 import pdf2image
 import google.generativeai as genai
 import plotly.graph_objects as go
 
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 # ---------------------- Gemini Response ----------------------
 def get_gemini_response(prompt, pdf_content=None, job_desc=""):
     model = genai.GenerativeModel("gemini-1.5-flash")
