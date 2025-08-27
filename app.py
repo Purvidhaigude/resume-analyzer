@@ -2,7 +2,7 @@ import streamlit as st
 import base64
 import io
 from PIL import Image
-import PyPDF2
+import pypdf   # ✅ sahi package
 import google.generativeai as genai
 import plotly.graph_objects as go
 
