@@ -1,9 +1,8 @@
 import streamlit as st
 import base64
-import os
 import io
 from PIL import Image
-import pdf2image
+import PyPDF2
 import google.generativeai as genai
 import plotly.graph_objects as go
 
