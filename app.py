@@ -1,12 +1,9 @@
+
 import streamlit as st
 import os
-import base64
-import io
-from PIL import Image
-import pdf2image
 import google.generativeai as genai
 import plotly.graph_objects as go
-import pytesseract   # 🔹 OCR ke liye
+import fitz  # 🔹 PyMuPDF
 
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
@@ -25,13 +22,13 @@ def get_gemini_response(prompt, pdf_content=None, job_desc=""):
     return response.text
 
 
-# ---------------------- PDF Setup (updated with OCR) ----------------------
+# ---------------------- PDF Setup (PyMuPDF) ----------------------
 def input_pdf_setup(uploaded_file):
     if uploaded_file is not None:
-        images = pdf2image.convert_from_bytes(uploaded_file.read())
+        pdf_document = fitz.open(stream=uploaded_file.read(), filetype="pdf")
         pdf_text = ""
-        for page in images:
-            text = pytesseract.image_to_string(page)  # image se text nikalna
+        for page in pdf_document:
+            text = page.get_text("text")   # har page ka text nikalna
             pdf_text += text + "\n"
         return [pdf_text] if pdf_text.strip() else None
     else:
