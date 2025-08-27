@@ -3,4 +3,3 @@ google-generativeai
 pillow
 pdf2image
 plotly
-pillow
